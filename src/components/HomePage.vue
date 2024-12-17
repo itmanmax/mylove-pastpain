@@ -33,7 +33,7 @@ const goToChristmas = async () => {
   }
   
   // 使用固定域名生成完整的URL
-  const baseUrl = 'http://mylove.maxtral.fun'  // 修改为固定域名
+  const baseUrl = 'https://mylove2.maxtral.fun'  // 修改为固定域名
   const fullUrl = `${baseUrl}/Christmas?name=${encodeURIComponent(name.value)}&loved=${encodeURIComponent(loved.value)}`
   shareUrl.value = fullUrl
   
