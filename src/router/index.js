@@ -3,7 +3,7 @@ import HomePage from '../components/HomePage.vue'
 import ChristmasTreeEffect from '../components/ChristmasTreeEffect.vue'
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory('/'),
   routes: [
     {
       path: '/',

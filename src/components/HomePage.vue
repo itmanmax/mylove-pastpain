@@ -39,6 +39,7 @@ const goToChristmas = async () => {
   
   // 生成二维码
   await generateQRCode(fullUrl)
+  
   showShare.value = true
 }
 
