@@ -11,6 +11,8 @@ const qrCodeUrl = ref('')
 const shareUrl = ref('')
 const selectedFestival = ref(null)
 const newYearWish = ref('')
+const countdownType = ref('1') // 默认元旦倒计时
+const customDateTime = ref('') // 存储自定义日期时间
 
 const generateQRCode = async (url) => {
   try {
@@ -70,12 +72,65 @@ const selectFestival = (festival) => {
 }
 
 const goToNewYear = () => {
-  if (!name.value || !loved.value || !newYearWish.value) {
-    alert('请填写完整信息')
+  if (!loved.value || !newYearWish.value) {
+    alert('请填写必要信息')
     return
   }
   
-  router.push(`/NewYear?name=${encodeURIComponent(name.value)}&loved=${encodeURIComponent(loved.value)}&wish=${encodeURIComponent(newYearWish.value)}`)
+  // 验证自定义时间
+  if (countdownType.value === '3') {
+    if (!customDateTime.value) {
+      alert('请选择目标日期时间')
+      return
+    }
+    
+    const targetTime = new Date(customDateTime.value).getTime()
+    const now = new Date().getTime()
+    
+    if (targetTime <= now) {
+      alert('目标时间必须大于当前时间')
+      return
+    }
+  }
+  
+  // 构建路由参数
+  const params = new URLSearchParams()
+  if (name.value) {
+    params.append('name', encodeURIComponent(name.value))
+  }
+  params.append('loved', encodeURIComponent(loved.value))
+  params.append('wish', encodeURIComponent(newYearWish.value))
+  params.append('type', countdownType.value)
+  
+  // 如果是自定义时间，添加时间参数
+  if (countdownType.value === '3' && customDateTime.value) {
+    params.append('targetTime', customDateTime.value)
+  }
+  
+  router.push(`/NewYear?${params.toString()}`)
+}
+
+// 获取当前时间的 ISO 字符串（用于日期时间选择器的最小值）
+const getCurrentDateTime = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+const handleSubmit = () => {
+  router.push({
+    path: '/NewYear',
+    query: {
+      name: form.name,
+      loved: encodeURIComponent(form.loved),
+      wish: encodeURIComponent(form.wish),
+      type: form.type
+    }
+  })
 }
 </script>
 
@@ -189,36 +244,110 @@ const goToNewYear = () => {
 
           <!-- 跨年表单 -->
           <div v-else-if="selectedFestival === 'newYear'" class="space-y-4">
+            <!-- 倒计时类型选择 -->
+            <div class="space-y-2">
+              <label class="block text-white mb-2">倒计时类型</label>
+              <div class="grid grid-cols-2 gap-2">
+                <button 
+                  @click="countdownType = '1'"
+                  :class="[
+                    'p-3 rounded-lg transition-all duration-300',
+                    countdownType === '1' 
+                      ? 'bg-blue-500 text-white' 
+                      : 'bg-white/10 text-white/80 hover:bg-white/20'
+                  ]"
+                >
+                  元旦倒计时
+                  <div class="text-xs opacity-75 mt-1">2024年1月1日</div>
+                </button>
+                
+                <button 
+                  @click="countdownType = '2'"
+                  :class="[
+                    'p-3 rounded-lg transition-all duration-300',
+                    countdownType === '2' 
+                      ? 'bg-red-500 text-white' 
+                      : 'bg-white/10 text-white/80 hover:bg-white/20'
+                  ]"
+                >
+                  春节倒计时
+                  <div class="text-xs opacity-75 mt-1">2024年2月10日</div>
+                </button>
+                
+                <button 
+                  @click="countdownType = '3'"
+                  :class="[
+                    'p-3 rounded-lg transition-all duration-300',
+                    countdownType === '3' 
+                      ? 'bg-green-500 text-white' 
+                      : 'bg-white/10 text-white/80 hover:bg-white/20'
+                  ]"
+                >
+                  自定义倒计时
+                </button>
+                
+                <button 
+                  @click="countdownType = '4'"
+                  :class="[
+                    'p-3 rounded-lg transition-all duration-300',
+                    countdownType === '4' 
+                      ? 'bg-purple-500 text-white' 
+                      : 'bg-white/10 text-white/80 hover:bg-white/20'
+                  ]"
+                >
+                  20秒倒计时
+                </button>
+              </div>
+            </div>
+            
+            <!-- 自定义时间选择器（仅在选择自定义倒计时时显示） -->
+            <div v-if="countdownType === '3'" class="space-y-2">
+              <label class="block text-white mb-2">目标日期时间</label>
+              <input 
+                v-model="customDateTime"
+                type="datetime-local"
+                :min="getCurrentDateTime()"
+                class="w-full p-2 rounded bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white"
+                required
+              />
+            </div>
+
+            <!-- 祝福人信息（选填） -->
             <div>
-              <label class="block text-white mb-2">你的名字</label>
+              <label class="block text-white mb-2">你的名字 (选填)</label>
               <input 
                 v-model="name"
                 type="text"
                 class="w-full p-2 rounded bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white"
-                placeholder="请输入你的名字"
+                placeholder="请输入你的名字（可选）"
               >
             </div>
 
+            <!-- 被祝福人信息（必填） -->
             <div>
-              <label class="block text-white mb-2">TA的名字</label>
+              <label class="block text-white mb-2">TA的名字 (必填)</label>
               <input 
                 v-model="loved"
                 type="text"
                 class="w-full p-2 rounded bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white"
                 placeholder="请输入TA的名字"
+                required
               >
             </div>
 
+            <!-- 祝福语（必填） -->
             <div>
-              <label class="block text-white mb-2">新年祝福语</label>
+              <label class="block text-white mb-2">新年祝福语 (必填)</label>
               <textarea 
                 v-model="newYearWish"
                 class="w-full p-2 rounded bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white"
                 rows="3"
                 placeholder="写下你的新年祝福..."
+                required
               ></textarea>
             </div>
 
+            <!-- 提交按钮 -->
             <button 
               @click="goToNewYear"
               class="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors mt-6"
@@ -226,6 +355,7 @@ const goToNewYear = () => {
               生成祝福
             </button>
 
+            <!-- 返回按钮 -->
             <button 
               @click="selectedFestival = null"
               class="w-full bg-transparent text-white/60 py-2 hover:text-white transition-colors"

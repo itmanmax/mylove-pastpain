@@ -25,9 +25,11 @@ const router = createRouter({
       name: 'NewYear',
       component: NewYearEffect,
       props: route => ({
-        name: route.query.name || 'max',
-        loved: route.query.loved || 'max',
-        wish: route.query.wish || '新年快乐!'
+        name: route.query.name || '',
+        loved: route.query.loved || '',
+        wish: route.query.wish || '',
+        type: route.query.type || '1',
+        targetTime: route.query.targetTime || ''
       })
     }
   ]

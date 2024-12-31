@@ -5,15 +5,23 @@ import gsap from 'gsap'
 const props = defineProps({
   name: {
     type: String,
-    default: 'max'
+    default: ''
   },
   loved: {
     type: String,
-    default: 'max'
+    required: true
   },
   wish: {
     type: String,
-    default: '新年快乐!'
+    required: true
+  },
+  type: {
+    type: String,
+    default: '1'
+  },
+  targetTime: {
+    type: String,
+    default: ''
   }
 })
 
@@ -331,8 +339,8 @@ const animate = () => {
     }
   }
 
-  // 只在没有特殊烟花时生成随机烟花
-  if (!isSpecialFireworkActive.value) {
+  // 只在非特殊状态且非倒计时结束前5秒时生成随机烟花
+  if (!isSpecialFireworkActive.value && !isCountdownEnding.value) {
     if (Math.random() < 0.04) {
       const rand = Math.random()
       if (rand < 0.2) { // 20% 概率生成同色连环烟花
@@ -541,56 +549,137 @@ const flipping = ref({
   seconds: false
 })
 
-// 获取到新年的时间差
-const getTimeUntilNewYear = () => {
+// 在 script setup 部分添加新的状态控制变量
+const countdownType = ref(1) // 1: 元旦, 2: 春节, 3: 自定义, 4: 20s
+const customDate = ref(null) // 用于存储自定义日期
+const twentySeconds = ref(20) // 20秒倒计时
+
+// 添加新的状态变量
+const isCountdownEnding = ref(false) // 控制倒计时结束前5秒的状态
+
+// 修改获取倒计时时间的函数
+const getTimeUntilTarget = () => {
   const now = new Date()
-  const newYear = new Date(now.getFullYear() + 1, 0, 1)
-  const diff = newYear - now
-  
-  // 确保天数正确计算，不会频繁变化
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-  const seconds = Math.floor((diff % (1000 * 60)) / 1000)
-  
-  return {
-    days: String(days).padStart(2, '0'),
-    hours: String(hours).padStart(2, '0'),
-    minutes: String(minutes).padStart(2, '0'),
-    seconds: String(seconds).padStart(2, '0')
+  let targetDate
+
+  switch (props.type) {
+    case '1': // 元旦倒计时
+      targetDate = new Date(now.getFullYear() + 1, 0, 1)
+      break
+    case '2': // 春节倒计时
+      // 2024年春节是2月10日
+      targetDate = new Date(2024, 1, 10)
+      if (now > targetDate) {
+        // 如果已过2024年春节，则计算2025年春节（1月29日）
+        targetDate = new Date(2025, 0, 29)
+      }
+      break
+    case '3': // 自定义时间倒计时
+      if (!props.targetTime) {
+        return {
+          days: '00',
+          hours: '00',
+          minutes: '00',
+          seconds: '00'
+        }
+      }
+      targetDate = new Date(props.targetTime)
+      break
+    case '4': // 20秒倒计时
+      const secondsLeft = twentySeconds.value
+      return {
+        days: '00',
+        hours: '00',
+        minutes: '00',
+        seconds: String(secondsLeft).padStart(2, '0')
+      }
+  }
+
+  if (props.type !== '4') {
+    const diff = targetDate - now
+    
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+    
+    return {
+      days: String(days).padStart(2, '0'),
+      hours: String(hours).padStart(2, '0'),
+      minutes: String(minutes).padStart(2, '0'),
+      seconds: String(seconds).padStart(2, '0')
+    }
   }
 }
 
+// 修改更新倒计时的函数
 const updateCountdown = () => {
-  const time = getTimeUntilNewYear()
-  
-  // 检查天数变化
-  if (days.value !== time.days) {
-    const oldNumber = days.value
+  if (props.type === '4') {
+    if (twentySeconds.value > 0) {
+      // 检查是否进入最后5秒
+      if (twentySeconds.value <= 5 && !isCountdownEnding.value) {
+        isCountdownEnding.value = true
+        isSpecialFireworkActive.value = true // 停止生成随机烟花
+      }
+      
+      twentySeconds.value--
+      
+      // 更新显示
+      updateNumberWithFlip('seconds', seconds.value, String(twentySeconds.value).padStart(2, '0'))
+      seconds.value = String(twentySeconds.value).padStart(2, '0')
+      days.value = '00'
+      hours.value = '00'
+      minutes.value = '00'
+      
+      if (twentySeconds.value === 0) {
+        handleCountdownEnd()
+      }
+    }
+  } else {
+    const time = getTimeUntilTarget()
+    
+    // 检查是否到达目标时间前5秒
+    if (time.days === '00' && time.hours === '00' && 
+        time.minutes === '00' && parseInt(time.seconds) <= 5 && 
+        !isCountdownEnding.value) {
+      isCountdownEnding.value = true
+      isSpecialFireworkActive.value = true // 停止生成随机烟花
+    }
+    
+    // 检查是否到达目标时间
+    if (time.days === '00' && time.hours === '00' && 
+        time.minutes === '00' && time.seconds === '00') {
+      handleCountdownEnd()
+      return
+    }
+    
+    // 更新数字显示
+    updateNumberWithFlip('days', days.value, time.days)
+    updateNumberWithFlip('hours', hours.value, time.hours)
+    updateNumberWithFlip('minutes', minutes.value, time.minutes)
+    updateNumberWithFlip('seconds', seconds.value, time.seconds)
+    
     days.value = time.days
-    updateNumberWithFlip('days', oldNumber, time.days)
-  }
-  
-  // 检查小时变化
-  if (hours.value !== time.hours) {
-    const oldNumber = hours.value
     hours.value = time.hours
-    updateNumberWithFlip('hours', oldNumber, time.hours)
-  }
-  
-  // 检查分钟变化
-  if (minutes.value !== time.minutes) {
-    const oldNumber = minutes.value
     minutes.value = time.minutes
-    updateNumberWithFlip('minutes', oldNumber, time.minutes)
-  }
-  
-  // 检查秒数变化
-  if (seconds.value !== time.seconds) {
-    const oldNumber = seconds.value
     seconds.value = time.seconds
-    updateNumberWithFlip('seconds', oldNumber, time.seconds)
   }
+}
+
+// 添加切换倒计时类型的函数
+const switchCountdownType = (type) => {
+  countdownType.value = type
+  if (type === 4) {
+    twentySeconds.value = 20 // 重置20秒倒计时
+  }
+  updateCountdown() // 立即更新显示
+}
+
+// 设置自定义日期的函数
+const setCustomDate = (date) => {
+  customDate.value = date
+  countdownType.value = 3
+  updateCountdown()
 }
 
 // 处理数字翻转的函数
@@ -652,31 +741,195 @@ watch(flipping, (newVal, oldVal) => {
     }
   })
 })
+
+// 在 script setup 部分添加新的状态控制变量
+const showCountdown = ref(true)
+const showControls = ref(true)
+
+// 添加处理倒计时结束的函数
+const handleCountdownEnd = async () => {
+  // 隐藏倒计时和控制按钮
+  showCountdown.value = false
+  showControls.value = false
+  
+  // 确保停止所有随机烟花生成
+  isSpecialFireworkActive.value = true
+  
+  // 等待当前烟花和粒子完全消失
+  while (fireworks.length > 0 || particles.length > 0) {
+    await new Promise(r => setTimeout(r, 100))
+  }
+  
+  const startTime = Date.now()
+  
+  try {
+    // 第一波：20枚普通烟花（2秒）
+    const normalFireworks = Array(20).fill(null).map(() => {
+      const fw = new Firework(false)
+      fw.x = Math.random() * window.innerWidth
+      return fw
+    })
+    
+    fireworks.push(...normalFireworks)
+    await new Promise(r => setTimeout(r, 2000)) // 严格等待2秒
+    
+    // 等待所有普通烟花消失
+    while (fireworks.length > 0 || particles.length > 0) {
+      await new Promise(r => setTimeout(r, 100))
+    }
+    
+    // 第二波：10枚金色连环烟花（2秒）
+    const goldColor = '255, 215, 0'
+    for (let i = 0; i < 5; i++) {
+      const positions = []
+      const segment = window.innerWidth / 6
+      positions.push(segment * (i + 1))
+      positions.push(segment * (i + 1) + 100)
+      
+      const groupFireworks = positions.map(x => {
+        const fw = new Firework(false)
+        fw.x = x
+        fw.color = goldColor
+        fw.isGrouped = true
+        return fw
+      })
+      
+      fireworks.push(...groupFireworks)
+      await new Promise(r => setTimeout(r, 400)) // 每组间隔400ms
+    }
+    
+    await new Promise(r => setTimeout(r, 2000)) // 等待金色烟花完成
+    
+    // 等待所有金色烟花消失
+    while (fireworks.length > 0 || particles.length > 0) {
+      await new Promise(r => setTimeout(r, 100))
+    }
+    
+    // 第三波：5枚特定颜色的巨大烟花（3秒）
+    const giantColors = [
+      '255, 192, 203', // 粉色
+      '0, 0, 255',     // 蓝色
+      '255, 0, 0',     // 红色
+      '0, 255, 0',     // 绿色
+      '0, 255, 255'    // 青色
+    ]
+    
+    for (let i = 0; i < 5; i++) {
+      const giantFirework = new Firework(true)
+      giantFirework.x = (window.innerWidth / 6) * (i + 1)
+      giantFirework.color = giantColors[i]
+      fireworks.push(giantFirework)
+      await new Promise(r => setTimeout(r, 600)) // 每个巨大烟花间隔600ms
+    }
+    
+    // 等待所有巨大烟花消失
+    while (fireworks.length > 0 || particles.length > 0) {
+      await new Promise(r => setTimeout(r, 100))
+    }
+    
+    // 检查总时间是否超过7秒
+    if (Date.now() - startTime >= 7000) {
+      throw new Error('Time limit exceeded')
+    }
+    
+  } finally {
+    // 无论如何，7秒后显示文字并停止烟花
+    const timeElapsed = Date.now() - startTime
+    if (timeElapsed < 7000) {
+      await new Promise(r => setTimeout(r, 7000 - timeElapsed))
+    }
+    
+    // 清除所有剩余的烟花和粒子
+    fireworks.length = 0
+    particles.length = 0
+    
+    // 显示结束文字
+    showEndText.value = true
+    
+    // 确保不再生成新的烟花
+    isSpecialFireworkActive.value = true
+  }
+}
+
+// 在 script setup 顶部添加新的状态变量
+const showEndText = ref(false)
+const endTextConfig = ref({
+  from: props.name || '', // 祝福人
+  to: decodeURIComponent(props.loved), // 解码被祝福人
+  wish: decodeURIComponent(props.wish) // 解码祝福语
+})
+
+// 添加环绕祝福语数组
+const surroundingWishes = [
+  '龙年超飒', '福运狂飙', '喜乐扎堆', '薪资翻倍', '颜值破表',
+  '元气满仓', '快乐续航', '烦恼清零', '好梦速达', '学业猛进',
+  '事业雄起', '桃花爆棚', '健康满格', '创意井喷', '运气开挂',
+  '才华出圈', '生活撒糖', '友谊升温', '家庭焕新', '平安护体',
+  '休闲满档', '食欲大增', '旅途出彩', '心态躺赢', '诸事顺意'
+]
+
+// 修改获取样式的方法
+const getWishStyle = (index) => {
+  // 计算固定位置
+  const totalItems = 25
+  // 获取容器的实际尺寸（考虑页面缩放）
+  const containerWidth = 400  // 容器的基础宽度
+  const containerHeight = 300 // 容器的基础高度
+  const margin = 80 // 增加与容器边缘的距离
+  const spacing = 60 // 祝福语之间的间距
+  
+  // 将25个祝福语分配到容器的四周
+  let x, y
+  if (index < 7) { // 上边 7个
+    x = (containerWidth + spacing * 2) / 8 * (index + 1) - (containerWidth + spacing * 2) / 2
+    y = -containerHeight / 2 - margin
+  } else if (index < 13) { // 右边 6个
+    x = containerWidth / 2 + margin
+    y = (containerHeight + spacing * 2) / 7 * (index - 6) - (containerHeight + spacing * 2) / 2
+  } else if (index < 19) { // 下边 6个
+    x = containerWidth / 2 - (containerWidth + spacing * 2) / 7 * (index - 12)
+    y = containerHeight / 2 + margin
+  } else { // 左边 6个
+    x = -containerWidth / 2 - margin
+    y = containerHeight / 2 - (containerHeight + spacing * 2) / 7 * (index - 18)
+  }
+
+  // 随机倾斜角度（-20到20度之间）
+  const rotation = Math.random() * 40 - 20
+  const scale = 1.0 // 固定缩放比例
+
+  return {
+    transform: `translate(${x}px, ${y}px) rotate(${rotation}deg) scale(${scale})`,
+    opacity: 0.7 + Math.random() * 0.3,
+    animationDelay: `${index * 0.15}s`,
+    fontSize: `${20}px`,
+    '--x': `${x}px`,
+    '--y': `${y}px`,
+    '--rotation': `${rotation}deg`,
+    '--scale': scale
+  }
+}
 </script>
 
 <template>
   <div class="new-year-scene">
     <canvas ref="canvasRef" class="fireworks-canvas"></canvas>
     
-    <!-- 添加元旦快乐按钮和音效控制 -->
-    <div class="sound-control-wrapper">
+    <!-- 音效控制按钮 -->
+    <div v-show="showControls" class="sound-control-wrapper">
       <button class="happy-new-year-btn" @click="toggleSoundControl">
-        元旦快乐
+        音效控制
       </button>
-      
-      <!-- 音效控制面板 -->
       <transition name="fade">
-        <div v-if="showSoundControl" class="sound-control-panel">
+        <div v-show="showSoundControl" class="sound-control-panel">
           <button 
-            class="sound-btn" 
-            :class="{ active: isFireworkSoundEnabled }"
+            :class="['sound-btn', { active: isFireworkSoundEnabled }]"
             @click="toggleFireworkSound"
           >
             烟花音效
           </button>
           <button 
-            class="sound-btn" 
-            :class="{ active: isBackgroundMusicEnabled }"
+            :class="['sound-btn', { active: isBackgroundMusicEnabled }]"
             @click="toggleBackgroundMusic"
           >
             背景音乐
@@ -685,8 +938,8 @@ watch(flipping, (newVal, oldVal) => {
       </transition>
     </div>
 
-    <!-- 原有的倒计时容器 -->
-    <div class="countdown-container">
+    <!-- 倒计时显示 -->
+    <div v-show="showCountdown" class="countdown-container">
       <div class="countdown-display">
         <!-- 天数 -->
         <div class="number-group days">
@@ -740,7 +993,6 @@ watch(flipping, (newVal, oldVal) => {
           </div>
         </div>
       </div>
-
       <!-- 标签行 -->
       <div class="labels-row">
         <span class="label">天</span>
@@ -749,6 +1001,30 @@ watch(flipping, (newVal, oldVal) => {
         <span class="label">秒</span>
       </div>
     </div>
+
+    <!-- 结束文字 -->
+    <transition name="fade">
+      <div v-if="showEndText" class="end-text-container">
+        <div v-if="endTextConfig.from" class="end-text from-text">
+          {{ endTextConfig.from }}
+        </div>
+        <div class="end-text to-text">
+          祝 {{ endTextConfig.to }}
+        </div>
+        <div class="end-text wish-text">
+          {{ endTextConfig.wish }}
+        </div>
+        <!-- 添加额外祝福语容器 -->
+        <div class="surrounding-wishes">
+          <div v-for="(wish, index) in surroundingWishes" 
+               :key="index"
+               class="surrounding-wish"
+               :style="getWishStyle(index)">
+            {{ wish }}
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -919,7 +1195,7 @@ watch(flipping, (newVal, oldVal) => {
 
 /* 容器样式 */
 .countdown-container {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(56, 63, 59, 0.388);
   padding: 40px;
   border-radius: 20px;
   backdrop-filter: blur(10px);
@@ -1094,5 +1370,170 @@ watch(flipping, (newVal, oldVal) => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* 添加新的样式 */
+.countdown-type-controls {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 100;
+}
+
+.countdown-type-controls button {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.countdown-type-controls button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.countdown-type-controls button.active {
+  background: #ff4444;
+  box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+}
+
+/* 添加淡入淡出动画 */
+.countdown-container,
+.countdown-type-controls,
+.sound-control-wrapper {
+  transition: opacity 0.5s ease;
+}
+
+/* 当元素隐藏时使用透明度过渡 */
+.countdown-container[style*="display: none"],
+.countdown-type-controls[style*="display: none"],
+.sound-control-wrapper[style*="display: none"] {
+  opacity: 0;
+}
+
+/* 添加结束文字样式 */
+.end-text-container {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  z-index: 1000;
+  background: rgba(79, 40, 210, 0.5);
+  padding: 30px 50px;
+  border-radius: 15px;
+  min-width: 300px;
+  overflow: visible;
+}
+
+/* 基础文字样式 */
+.end-text {
+  color: #fff;
+  font-weight: bold;
+  text-align: center;
+  animation: glow 2s ease-in-out infinite alternate;
+}
+
+/* 祝福人样式 */
+.from-text {
+  font-size: 24px;
+  opacity: 0.9;
+}
+
+/* 被祝福人样式 */
+.to-text {
+  font-size: 48px;
+}
+
+/* 祝福语样式 */
+.wish-text {
+  font-size: 32px;
+  margin-top: 10px;
+}
+
+@keyframes glow {
+  from {
+    text-shadow: 0 0 10px #fff, 0 0 20px #fff, 0 0 30px #ff4444;
+  }
+  to {
+    text-shadow: 0 0 20px #fff, 0 0 30px #ff4444, 0 0 40px #ff4444;
+  }
+}
+
+/* 保持原有的淡入淡出效果 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* 环绕祝福语容器样式 */
+.surrounding-wishes {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* 单个环绕祝福语样式 */
+.surrounding-wish {
+  position: absolute;
+  transform-origin: center;
+  color: #fff;
+  font-weight: bold;
+  white-space: nowrap;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
+  animation: fadeInAndStay 1s ease-out forwards, glowAnimation 3s ease-in-out infinite;
+  opacity: 0;
+  transition: all 0.3s ease;
+  transform-origin: center center;
+}
+
+/* 添加浮动和淡入动画 */
+@keyframes fadeInAndStay {
+  0% {
+    opacity: 0;
+    transform: translate(var(--x), var(--y)) scale(0.5) rotate(var(--rotation));
+  }
+  100% {
+    opacity: 1;
+    transform: translate(var(--x), var(--y)) scale(var(--scale)) rotate(var(--rotation));
+  }
+}
+
+/* 添加持续的浮动动画 */
+@keyframes glowAnimation {
+  0% {
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.8), 0 0 30px rgba(255, 68, 68, 0.6);
+  }
+  100% {
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  }
+}
+
+/* 为环绕祝福语添加悬浮效果 */
+.surrounding-wish:hover {
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.8),
+              0 0 25px rgba(255, 68, 68, 0.6);
+  cursor: default;
+  z-index: 1001;
 }
 </style> 
