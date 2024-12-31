@@ -9,6 +9,8 @@ const loved = ref('')
 const showShare = ref(false)
 const qrCodeUrl = ref('')
 const shareUrl = ref('')
+const selectedFestival = ref(null)
+const newYearWish = ref('')
 
 const generateQRCode = async (url) => {
   try {
@@ -44,8 +46,9 @@ const goToChristmas = async () => {
 }
 
 const visitUrl = () => {
-  // 本地导航仍然使用相对路径
-  router.push(`/Christmas?name=${name.value}&loved=${loved.value}`)
+  if (selectedFestival.value === 'christmas') {
+    router.push(`/Christmas?name=${name.value}&loved=${loved.value}`)
+  }
 }
 
 const copyUrl = async () => {
@@ -55,6 +58,24 @@ const copyUrl = async () => {
   } catch (err) {
     console.error('Failed to copy:', err)
   }
+}
+
+const selectFestival = (festival) => {
+  selectedFestival.value = festival
+  // 重置表单
+  name.value = ''
+  loved.value = ''
+  newYearWish.value = ''
+  showShare.value = false
+}
+
+const goToNewYear = () => {
+  if (!name.value || !loved.value || !newYearWish.value) {
+    alert('请填写完整信息')
+    return
+  }
+  
+  router.push(`/NewYear?name=${encodeURIComponent(name.value)}&loved=${encodeURIComponent(loved.value)}&wish=${encodeURIComponent(newYearWish.value)}`)
 }
 </script>
 
@@ -80,9 +101,57 @@ const copyUrl = async () => {
       <!-- 右侧表单 -->
       <div class="flex-1">
         <div class="bg-white/10 backdrop-blur-md p-8 rounded-lg shadow-xl max-w-md ml-auto">
-          <h1 class="text-4xl font-bold text-center text-white mb-8">圣诞快乐</h1>
+          <h1 class="text-4xl font-bold text-center text-white mb-8">节日祝福</h1>
           
-          <div v-if="!showShare" class="space-y-4">
+          <!-- 未选择节日时显示选择界面 -->
+          <div v-if="!selectedFestival" class="space-y-4">
+            <!-- 圣诞节选项 -->
+            <button 
+              @click="selectFestival('christmas')"
+              class="w-full bg-gradient-to-r from-red-500 to-red-600 text-white p-6 rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-300 flex flex-col items-center space-y-2 group"
+            >
+              <span class="text-4xl group-hover:scale-110 transition-transform duration-300">🎄</span>
+              <span class="text-xl font-semibold">圣诞祝福</span>
+              <span class="text-sm opacity-80">制作温馨的圣诞节贺卡</span>
+            </button>
+
+            <!-- 跨年选项 -->
+            <button 
+              @click="selectFestival('newYear')"
+              class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-300 flex flex-col items-center space-y-2 group"
+            >
+              <span class="text-4xl group-hover:scale-110 transition-transform duration-300">🎆</span>
+              <span class="text-xl font-semibold">跨年祝福</span>
+              <span class="text-sm opacity-80">创建新年倒计时贺卡</span>
+            </button>
+
+            <!-- 注释说明部分保持不变 -->
+            <div class="mt-8 space-y-2 text-white/60 text-sm">
+              <p class="flex items-center">
+                <span class="text-yellow-500 mr-2">✨</span>
+                即将更新：春节、元旦等节日祝福
+              </p>
+              <p class="flex items-center">
+                <span class="text-blue-500 mr-2">🔄</span>
+                持续优化：更多动画效果和互动内容
+              </p>
+              <a 
+                href="https://maxtral.fun" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                class="flex items-center hover:text-white cursor-pointer transition-colors"
+              >
+                <span class="text-green-500 mr-2">💝</span>
+                欢迎反馈：帮助我们做得更好
+              </a>
+              <p class="text-xs text-white/40 mt-4 text-center">
+                Version 1.0 - Made with ❤️ by max
+              </p>
+            </div>
+          </div>
+
+          <!-- 圣诞节表单 -->
+          <div v-else-if="selectedFestival === 'christmas'" class="space-y-4">
             <div>
               <label class="block text-white mb-2">你的名字</label>
               <input 
@@ -110,33 +179,63 @@ const copyUrl = async () => {
               生成祝福
             </button>
 
-            <!-- 添加注释说明 -->
-            <div class="mt-8 space-y-2 text-white/60 text-sm">
-              <p class="flex items-center">
-                <span class="text-yellow-500 mr-2">✨</span>
-                即将更新：春节、元旦等节日祝福
-              </p>
-              <p class="flex items-center">
-                <span class="text-blue-500 mr-2">🔄</span>
-                持续优化：更多动画效果和互动内容
-              </p>
-              <a 
-                href="https://maxtral.fun" 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                class="flex items-center hover:text-white cursor-pointer transition-colors"
+            <button 
+              @click="selectedFestival = null"
+              class="w-full bg-transparent text-white/60 py-2 hover:text-white transition-colors"
+            >
+              返回选择
+            </button>
+          </div>
+
+          <!-- 跨年表单 -->
+          <div v-else-if="selectedFestival === 'newYear'" class="space-y-4">
+            <div>
+              <label class="block text-white mb-2">你的名字</label>
+              <input 
+                v-model="name"
+                type="text"
+                class="w-full p-2 rounded bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white"
+                placeholder="请输入你的名字"
               >
-                <span class="text-green-500 mr-2">💝</span>
-                欢迎反馈：帮助我们做得更好
-              </a>
-              <p class="text-xs text-white/40 mt-4 text-center">
-                Version 1.0 - Made with ❤️ by max
-              </p>
             </div>
+
+            <div>
+              <label class="block text-white mb-2">TA的名字</label>
+              <input 
+                v-model="loved"
+                type="text"
+                class="w-full p-2 rounded bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white"
+                placeholder="请输入TA的名字"
+              >
+            </div>
+
+            <div>
+              <label class="block text-white mb-2">新年祝福语</label>
+              <textarea 
+                v-model="newYearWish"
+                class="w-full p-2 rounded bg-white/20 text-white border border-white/30 focus:outline-none focus:border-white"
+                rows="3"
+                placeholder="写下你的新年祝福..."
+              ></textarea>
+            </div>
+
+            <button 
+              @click="goToNewYear"
+              class="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 transition-colors mt-6"
+            >
+              生成祝福
+            </button>
+
+            <button 
+              @click="selectedFestival = null"
+              class="w-full bg-transparent text-white/60 py-2 hover:text-white transition-colors"
+            >
+              返回选择
+            </button>
           </div>
 
           <!-- 分享界面 -->
-          <div v-else class="space-y-6">
+          <div v-if="showShare" class="space-y-6">
             <div class="flex justify-center">
               <img 
                 :src="qrCodeUrl" 
